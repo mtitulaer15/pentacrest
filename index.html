@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>360 Multi-Scene Story</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+
+  <style>
+    /* All template-owned selectors use the p360 namespace. */
+    #p360-root,
+    #p360-root * {
+      box-sizing: border-box;
+    }
+
+    #p360-root {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      min-height: 420px;
+      overflow: hidden;
+      isolation: isolate;
+      background: #000;
+      color: #fff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #p360-root button,
+    #p360-root a {
+      font: inherit;
+    }
+
+    #p360-panorama {
+      width: 100%;
+      height: 100%;
+    }
+
+    .p360-sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    .p360-scene-title {
+      position: absolute;
+      top: 16px;
+      left: 76px;
+      z-index: 20;
+      max-width: min(60%, 520px);
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.78);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 650;
+      line-height: 1.25;
+      pointer-events: none;
+    }
+
+    .p360-text-view-button {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 35;
+      border: 0;
+      padding: 3px 5px;
+      background: rgba(0, 0, 0, 0.68);
+      color: #fff;
+      font: inherit;
+      font-size: 0.75rem;
+      line-height: 1.25;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      cursor: pointer;
+    }
+
+    .p360-text-view-button:hover {
+      background: rgba(0, 0, 0, 0.86);
+    }
+
+    .p360-text-view-button:focus-visible {
+      outline: 3px solid #fff;
+      outline-offset: 2px;
+    }
+
+    .p360-text-view-button:hover,
+    .p360-text-view-button:focus-visible {
+      background: #111;
+      outline: 3px solid #fff;
+      outline-offset: 2px;
+    }
+
+    /* Pannellum continuously sets transform on hotspots. Do not animate or replace it. */
+    .p360-hotspot {
+      --p360-hotspot-size: 36px;
+      width: var(--p360-hotspot-size);
+      height: var(--p360-hotspot-size);
+      border-radius: 999px;
+      border: 3px solid #fff;
+      background: rgba(0, 0, 0, 0.82);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 700;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.65);
+      transition: background-color 0.18s ease;
+      overflow: visible;
+      padding: 0;
+    }
+
+    .p360-hotspot:hover,
+    .p360-hotspot:focus-visible {
+      background: rgba(30, 30, 30, 0.98);
+      outline: 3px solid #fff;
+      outline-offset: 3px;
+    }
+
+    .p360-hotspot img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .p360-hotspot.p360-is-teleport {
+      border-radius: 9px;
+      background: rgba(0, 68, 102, 0.95);
+    }
+
+    .p360-hotspot.p360-is-teleport:hover,
+    .p360-hotspot.p360-is-teleport:focus-visible {
+      background: rgba(0, 84, 126, 1);
+    }
+
+    .p360-scene-nav {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      z-index: 30;
+      display: flex;
+      gap: 10px;
+      max-width: calc(100% - 32px);
+      padding: 10px;
+      overflow-x: auto;
+      transform: translateX(-50%);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.78);
+      scrollbar-width: thin;
+    }
+
+    .p360-scene-nav[hidden] {
+      display: none;
+    }
+
+    .p360-scene-thumb {
+      flex: 0 0 112px;
+      display: grid;
+      gap: 5px;
+      padding: 4px;
+      border: 2px solid transparent;
+      border-radius: 9px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .p360-scene-thumb:hover,
+    .p360-scene-thumb:focus-visible {
+      border-color: #fff;
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+
+    .p360-scene-thumb.p360-is-active {
+      border-color: #fff;
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .p360-scene-thumb img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      border-radius: 5px;
+      background: #222;
+    }
+
+    .p360-scene-thumb span {
+      padding: 0 2px 2px;
+      font-size: 0.78rem;
+      font-weight: 650;
+      line-height: 1.2;
+    }
+
+    .p360-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.72);
+    }
+
+    .p360-overlay.p360-is-open {
+      display: flex;
+    }
+
+    .p360-dialog-card,
+    .p360-text-panel {
+      position: relative;
+      width: min(760px, 100%);
+      max-height: min(82vh, 820px);
+      overflow: auto;
+      border-radius: 16px;
+      background: #fff;
+      color: #161616;
+      box-shadow: 0 20px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    .p360-dialog-content,
+    .p360-text-panel-content {
+      padding: 24px;
+    }
+
+    .p360-dialog-content h2,
+    .p360-text-panel-content h2 {
+      margin: 0 0 10px;
+      font-size: clamp(1.4rem, 2.5vw, 2rem);
+      line-height: 1.15;
+    }
+
+    .p360-dialog-content p,
+    .p360-text-panel-content p {
+      margin: 0 0 16px;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .p360-dialog-close {
+      position: sticky;
+      top: 0;
+      float: right;
+      z-index: 2;
+      margin: 12px 12px 0 0;
+      width: 42px;
+      height: 42px;
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background: #222;
+      color: #fff;
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .p360-dialog-close:hover,
+    .p360-dialog-close:focus-visible {
+      background: #000;
+      outline: 3px solid #000;
+      outline-offset: 2px;
+    }
+
+    .p360-annotation-media {
+      margin-top: 16px;
+    }
+
+    .p360-annotation-media img,
+    .p360-annotation-media video {
+      display: block;
+      width: 100%;
+      max-height: 55vh;
+      object-fit: contain;
+      border-radius: 10px;
+      background: #111;
+    }
+
+    .p360-annotation-media audio {
+      width: 100%;
+    }
+
+    .p360-annotation-media iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+      border-radius: 10px;
+      background: #111;
+    }
+
+    .p360-annotation-link {
+      display: inline-block;
+      margin-top: 4px;
+      color: #0645ad;
+      font-weight: 650;
+    }
+
+    .p360-slideshow {
+      display: grid;
+      gap: 14px;
+    }
+
+    .p360-slideshow-image {
+      display: block;
+      width: 100%;
+      max-height: 52vh;
+      object-fit: contain;
+      border-radius: 10px;
+      background: #111;
+    }
+
+    .p360-slideshow-caption {
+      display: grid;
+      gap: 6px;
+    }
+
+    .p360-slideshow-caption h3 {
+      margin: 0;
+      font-size: 1.15rem;
+      line-height: 1.2;
+    }
+
+    .p360-slideshow-caption p {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .p360-slideshow-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .p360-slideshow-button,
+    .p360-text-action {
+      border: 2px solid #161616;
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: #161616;
+      color: #fff;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .p360-slideshow-button:hover,
+    .p360-slideshow-button:focus-visible,
+    .p360-text-action:hover,
+    .p360-text-action:focus-visible {
+      background: #000;
+      outline: 3px solid #000;
+      outline-offset: 2px;
+    }
+
+    .p360-slideshow-button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .p360-slideshow-counter {
+      color: #555;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .p360-text-hotspot-list {
+      display: grid;
+      gap: 12px;
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .p360-text-hotspot-item {
+      padding: 14px;
+      border: 1px solid #bbb;
+      border-radius: 10px;
+    }
+
+    .p360-text-hotspot-item h3 {
+      margin: 0 0 7px;
+      font-size: 1.05rem;
+    }
+
+    .p360-text-hotspot-item p {
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 600px) {
+      #p360-root {
+        min-height: 520px;
+      }
+
+      .p360-overlay {
+        padding: 12px;
+      }
+
+      .p360-dialog-content,
+      .p360-text-panel-content {
+        padding: 18px;
+      }
+
+      .p360-scene-title {
+        top: 10px;
+        left: 68px;
+        max-width: 50%;
+      }
+
+      .p360-text-view-button {
+        top: 10px;
+        right: 10px;
+      }
+
+      .p360-scene-nav {
+        bottom: 10px;
+        max-width: calc(100% - 20px);
+      }
+
+      .p360-scene-thumb {
+        flex-basis: 92px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #p360-root *,
+      #p360-root *::before,
+      #p360-root *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <section id="p360-root" role="region" aria-labelledby="p360-accessible-heading">
+    <h1 id="p360-accessible-heading" class="p360-sr-only">Interactive 360-degree multi-scene story</h1>
+    <p id="p360-instructions" class="p360-sr-only">
+      Drag or use the arrow keys to look around. Use plus and minus to zoom. Hotspots open information or move to another scene. A text view provides the same scene descriptions and hotspot actions without requiring the panorama.
+    </p>
+
+    <div
+      id="p360-panorama"
+      role="group"
+      aria-label="Interactive 360-degree scene viewer"
+      aria-describedby="p360-instructions p360-scene-description-live"
+    ></div>
+
+    <p class="p360-scene-title" id="p360-scene-title" aria-live="polite"></p>
+    <p id="p360-scene-description-live" class="p360-sr-only" aria-live="polite"></p>
+
+    <button class="p360-text-view-button" id="p360-text-view-button" type="button" aria-haspopup="dialog">
+      Text description
+    </button>
+
+    <nav class="p360-scene-nav" id="p360-scene-nav" aria-label="Choose a 360-degree scene"></nav>
+
+    <div class="p360-overlay" id="p360-annotation-overlay" hidden>
+      <article class="p360-dialog-card" role="dialog" aria-modal="true" aria-labelledby="p360-annotation-title">
+        <button class="p360-dialog-close" id="p360-annotation-close" type="button" aria-label="Close annotation">&times;</button>
+        <div class="p360-dialog-content">
+          <h2 id="p360-annotation-title"></h2>
+          <div id="p360-annotation-description"></div>
+          <div class="p360-annotation-media" id="p360-annotation-media"></div>
+          <a class="p360-annotation-link" id="p360-annotation-link" href="#" target="_blank" rel="noopener"></a>
+        </div>
+      </article>
+    </div>
+
+    <div class="p360-overlay" id="p360-text-overlay" hidden>
+      <section class="p360-text-panel" role="dialog" aria-modal="true" aria-labelledby="p360-text-title">
+        <button class="p360-dialog-close" id="p360-text-close" type="button" aria-label="Close text view">&times;</button>
+        <div class="p360-text-panel-content">
+          <h2 id="p360-text-title"></h2>
+          <p id="p360-text-description"></p>
+          <h3>Hotspots in this scene</h3>
+          <ul class="p360-text-hotspot-list" id="p360-text-hotspot-list"></ul>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+
+  <script>
+    (() => {
+      "use strict";
+
+      /*
+        STUDENTS EDIT THIS SECTION
+        ------------------------------------------------------------
+        1. Set the global display and zoom options below.
+        2. Add each panorama to SCENES with a unique scene ID.
+        3. Add a concise description for every scene. This supplies the text alternative.
+        4. Each scene can have its own starting view and hotspots.
+        5. Use type: "annotation" for a popup hotspot.
+        6. Use type: "teleport" and targetScene: "scene-id" to move elsewhere.
+        7. Give each hotspot a meaningful label and useful description.
+        8. Annotation descriptions may contain trusted HTML. Do not paste untrusted code.
+        9. For hosted audio or video, paste the service's full embed code into mediaEmbed.
+        10. Give informative images useful alt text. Use an empty alt only for decorative images.
+        11. Open the browser console and click the panorama to find pitch and yaw.
+      */
+
+      const P360_SHOW_SCENE_THUMBNAILS = true;
+      const P360_SHOW_SCENE_TITLE = true;
+      const P360_START_FULLY_ZOOMED_OUT = true;
+      const P360_MAX_HFOV = 120;
+      const P360_FIRST_SCENE = "marsh-boardwalk";
+
+      const P360_SCENES = {
+        "marsh-boardwalk": {
+          title: "The Pentacrest",
+          description: "A fall-season 360-degree view from the Pentacrest at the University of Iowa, an iconic symbol of this campus.",
+          panorama: "images/pentacrest.jpg",
+          thumbnail: "images/pentacrest.jpg",
+          thumbnailAlt: "The top of the Pentacrest at the University of Iowa",
+          startView: {
+            yaw: 0,
+            pitch: 0,
+            hfov: 120
+          },
+          hotspots: [
+            {
+              id: "Old Capitol",
+              type: "annotation",
+              label: "The Capitol Building",
+              pitch: 21.23,
+              yaw: -179.32,
+              iconSize: 32,
+              fallbackIcon: "+",
+              title: "The Capitol Building",
+              description: `
+                <p>The Capitol Building is a historic structure that serves as the administrative center for the University of Iowa.</p>
+    
+              `,
+              mediaType: "embed",
+              mediaEmbed: `<iframe width="560" height="315" src="https://www.youtube.com/embed/ka_yervZF2I?si=yofyisD-w-QAgkr9" title="Historic Buildings of Iowa: Iowa City" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`,
+              mediaTitle: "Historic Buildings of Iowa: Iowa City"
+            },
+            {
+              id: "MacLean Hall",
+              type: "annotation",
+              label: "MacLean Hall",
+              pitch: 5.59,
+              yaw: -94.97,
+              iconSize: 32,
+              fallbackIcon: "+",
+              title: "MacLean Hall",
+              description: `
+                <p>MacLean Hall is a historic building on the University of Iowa campus, one of the largest lecture halls on campus.</p>
+              `,
+              mediaType: "image",
+  mediaSrc: "images/top_of_pentacrest.jpeg",
+  mediaAlt: "Photograph of the top of the Pentacrest at the University of Iowa, showing the surrounding campus and buildings.",
+            },
+            {
+              id: "go-to-hawk-mountain",
+              type: "teleport",
+              label: "Travel to Hawk Mountain",
+              description: "Move from the marsh boardwalk to the Hawk Mountain overlook.",
+              pitch: 0,
+              yaw: 0,
+              targetScene: "hawk-mountain",
+              targetYaw: 1.78,
+              targetPitch: 124.27,
+              targetHfov: 120,
+              iconSize: 38,
+              fallbackIcon: "➜"
+            }
+          ]
+        },
+
+        "hawk-mountain": {
+           title: "Adler Walkway",
+          description: "A 360-degree fall view from the Adler and Library Walkway at the University of Iowa as students walk to class.",
+          panorama: "images/Adler-Walkway.jpg",
+          thumbnail: "images/Adler-Walkway.jpg",
+          thumbnailAlt: "The Adler Walkway at the University of Iowa.",
+          startView: {
+            yaw: 0,
+            pitch: 0,
+            hfov: 120
+          },
+          hotspots: [
+            {
+              id: "Adler School of Journalism of Mass Communication Building",
+              type: "annotation",
+              label: "Adler School of Journalism and Mass Communication Building",
+              pitch: 8.22,
+              yaw: -13.41,
+              iconSize: 32,
+              fallbackIcon: "+",
+              title: "Adler School of Journalism and Mass Communication",
+              description: `
+                <p>The Adler School of Journalism and Mass Communication is a leading school for students interested in media and communication studies.</p>
+              `,
+                 mediaType: "embed",
+              mediaEmbed: `<iframe src="https://www.youtube.com/embed/E3e53bVJSNw?si=OKek9YzCSEjC_ahF" title="Tour the Journalism and Mass Communication Building" scrolling="no" frameborder="0" width="340" height="115"></iframe>`,
+              mediaTitle: "Tour the Adler School of Journalism and Mass Communication Building"
+            },
+            {
+              id: "Main Library",
+              type: "annotation",
+              label: "Main Library",
+              pitch: 0.79,
+              yaw: -153.46,
+              iconSize: 32,
+              fallbackIcon: "+",
+              title: "Main Library",
+              description: `
+                <p>The Main Library is the heart of the university's academic resources, housing millions of books, journals, and digital materials.</p>
+              `,
+              title: "University of Iowa Libraries",
+                description: "<p>The Main Library is the heart of the university's academic resources, housing millions of books, journals, and digital materials. Read the full article for additional context.</p>",
+                linkUrl: "https://www.lib.uiowa.edu/",
+                 linkText: "Read more about University of Iowa Libraries"
+            },
+            {
+              id: "return-to-pentacrest",
+              type: "teleport",
+              label: "Return to the Pentacrest",
+              description: "Move from Adler Walkway back to the Pentacrest.",
+              pitch: 3.04,
+              yaw: 121.32,
+              targetScene: "marsh-boardwalk",
+              targetYaw: 0,
+              targetPitch: 0,
+              targetHfov: 120,
+              iconSize: 38,
+              fallbackIcon: "➜"
+            }
+          ]
+        }
+      };
+      /* END STUDENT EDITING SECTION */
+
+      const p360Root = document.getElementById("p360-root");
+      const p360AnnotationOverlay = document.getElementById("p360-annotation-overlay");
+      const p360AnnotationClose = document.getElementById("p360-annotation-close");
+      const p360AnnotationTitle = document.getElementById("p360-annotation-title");
+      const p360AnnotationDescription = document.getElementById("p360-annotation-description");
+      const p360AnnotationMedia = document.getElementById("p360-annotation-media");
+      const p360AnnotationLink = document.getElementById("p360-annotation-link");
+      const p360SceneNav = document.getElementById("p360-scene-nav");
+      const p360SceneTitle = document.getElementById("p360-scene-title");
+      const p360SceneDescriptionLive = document.getElementById("p360-scene-description-live");
+      const p360TextViewButton = document.getElementById("p360-text-view-button");
+      const p360TextOverlay = document.getElementById("p360-text-overlay");
+      const p360TextClose = document.getElementById("p360-text-close");
+      const p360TextTitle = document.getElementById("p360-text-title");
+      const p360TextDescription = document.getElementById("p360-text-description");
+      const p360TextHotspotList = document.getElementById("p360-text-hotspot-list");
+
+      let p360CurrentSceneId = P360_FIRST_SCENE;
+      let p360LastFocusedElement = null;
+
+      function p360GetFocusable(container) {
+        return [...container.querySelectorAll(
+          'a[href], button:not([disabled]), audio[controls], video[controls], iframe, [tabindex]:not([tabindex="-1"])'
+        )].filter((element) => !element.hidden && element.offsetParent !== null);
+      }
+
+      function p360TrapDialogFocus(event, overlay) {
+        if (event.key !== "Tab") return;
+        const focusable = p360GetFocusable(overlay);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+
+      function p360OpenOverlay(overlay, closeButton) {
+        p360LastFocusedElement = document.activeElement;
+        overlay.hidden = false;
+        overlay.classList.add("p360-is-open");
+        p360Root.querySelectorAll(":scope > :not(.p360-overlay)").forEach((element) => {
+          element.setAttribute("aria-hidden", "true");
+        });
+        closeButton.focus();
+      }
+
+      function p360CloseOverlay(overlay, returnFocus = true) {
+        if (overlay.hidden) return;
+        overlay.classList.remove("p360-is-open");
+        overlay.hidden = true;
+        p360Root.querySelectorAll(":scope > :not(.p360-overlay)").forEach((element) => {
+          element.removeAttribute("aria-hidden");
+        });
+        if (returnFocus && p360LastFocusedElement instanceof HTMLElement) {
+          p360LastFocusedElement.focus();
+        }
+      }
+
+      function p360CreateHotspotElement(hotSpotDiv, args) {
+        const isTeleport = args.type === "teleport";
+
+        hotSpotDiv.classList.add("p360-hotspot");
+        if (isTeleport) hotSpotDiv.classList.add("p360-is-teleport");
+
+        hotSpotDiv.setAttribute("tabindex", "0");
+        hotSpotDiv.setAttribute("role", "button");
+        hotSpotDiv.setAttribute(
+          "aria-label",
+          args.label || (isTeleport ? "Move to another scene" : "Open annotation")
+        );
+        hotSpotDiv.title = args.label || "";
+
+        if (args.iconSize) {
+          hotSpotDiv.style.setProperty("--p360-hotspot-size", `${args.iconSize}px`);
+        }
+
+        if (args.iconSrc) {
+          const iconImg = document.createElement("img");
+          iconImg.src = args.iconSrc;
+          iconImg.alt = args.iconAlt || "";
+          iconImg.onerror = () => {
+            hotSpotDiv.replaceChildren(document.createTextNode(args.fallbackIcon || (isTeleport ? "➜" : "+")));
+          };
+          hotSpotDiv.appendChild(iconImg);
+        } else {
+          hotSpotDiv.textContent = args.fallbackIcon || (isTeleport ? "➜" : "+");
+        }
+
+        const activate = () => {
+          p360LastFocusedElement = hotSpotDiv;
+          if (isTeleport) {
+            p360GoToScene(args.targetScene, {
+              yaw: args.targetYaw,
+              pitch: args.targetPitch,
+              hfov: args.targetHfov
+            });
+          } else {
+            p360OpenAnnotation(args);
+          }
+        };
+
+        hotSpotDiv.addEventListener("click", activate);
+        hotSpotDiv.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            activate();
+          }
+        });
+      }
+
+      function p360SceneToPannellumConfig(scene) {
+        const startView = scene.startView || {};
+
+        return {
+          type: "equirectangular",
+          panorama: scene.panorama,
+          yaw: startView.yaw ?? 0,
+          pitch: startView.pitch ?? 0,
+          hfov: startView.hfov ?? (P360_START_FULLY_ZOOMED_OUT ? P360_MAX_HFOV : 90),
+          hotSpots: (scene.hotspots || []).map((hotspot) => ({
+            id: hotspot.id,
+            pitch: hotspot.pitch,
+            yaw: hotspot.yaw,
+            cssClass: "p360-hotspot",
+            createTooltipFunc: p360CreateHotspotElement,
+            createTooltipArgs: hotspot
+          }))
+        };
+      }
+
+      const p360PannellumScenes = Object.fromEntries(
+        Object.entries(P360_SCENES).map(([sceneId, scene]) => [
+          sceneId,
+          p360SceneToPannellumConfig(scene)
+        ])
+      );
+
+      const p360Viewer = pannellum.viewer("p360-panorama", {
+        default: {
+          firstScene: P360_FIRST_SCENE,
+          autoLoad: true,
+          sceneFadeDuration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700,
+          showControls: true,
+          compass: false,
+          fullscreenCtrl: false,
+          keyboardZoom: true,
+          mouseZoom: true,
+          minHfov: 50,
+          maxHfov: P360_MAX_HFOV
+        },
+        scenes: p360PannellumScenes
+      });
+
+      function p360GoToScene(sceneId, view = {}) {
+        if (!P360_SCENES[sceneId]) {
+          console.error(`Scene not found: ${sceneId}`);
+          return;
+        }
+
+        p360CloseAnnotation(false);
+        p360CloseTextView(false);
+        p360CurrentSceneId = sceneId;
+        p360Viewer.loadScene(sceneId, view.pitch, view.yaw, view.hfov);
+      }
+
+      function p360UpdateSceneInterface(sceneId) {
+        p360CurrentSceneId = sceneId;
+        const scene = P360_SCENES[sceneId];
+        const title = scene?.title || "360-degree scene";
+        const description = scene?.description || "No text description has been provided for this scene.";
+
+        p360SceneTitle.textContent = title;
+        p360SceneTitle.hidden = !P360_SHOW_SCENE_TITLE;
+        p360SceneDescriptionLive.textContent = `${title}. ${description}`;
+
+        p360Root.querySelectorAll(".p360-scene-thumb").forEach((button) => {
+          const isActive = button.dataset.sceneId === sceneId;
+          button.classList.toggle("p360-is-active", isActive);
+          if (isActive) {
+            button.setAttribute("aria-current", "true");
+          } else {
+            button.removeAttribute("aria-current");
+          }
+        });
+      }
+
+      function p360BuildSceneNavigation() {
+        p360SceneNav.hidden = !P360_SHOW_SCENE_THUMBNAILS;
+        if (!P360_SHOW_SCENE_THUMBNAILS) return;
+
+        Object.entries(P360_SCENES).forEach(([sceneId, scene]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "p360-scene-thumb";
+          button.dataset.sceneId = sceneId;
+          button.setAttribute("aria-label", `View scene: ${scene.title || sceneId}`);
+
+          const image = document.createElement("img");
+          image.src = scene.thumbnail || scene.panorama;
+          image.alt = scene.thumbnailAlt || "";
+
+          const label = document.createElement("span");
+          label.textContent = scene.title || sceneId;
+
+          button.append(image, label);
+          button.addEventListener("click", () => p360GoToScene(sceneId));
+          p360SceneNav.appendChild(button);
+        });
+      }
+
+      function p360CreateSlideshow(slides) {
+        let currentSlide = 0;
+        const slideshow = document.createElement("div");
+        slideshow.className = "p360-slideshow";
+        const image = document.createElement("img");
+        image.className = "p360-slideshow-image";
+        const caption = document.createElement("div");
+        caption.className = "p360-slideshow-caption";
+        const slideTitle = document.createElement("h3");
+        const slideText = document.createElement("p");
+        const controls = document.createElement("div");
+        controls.className = "p360-slideshow-controls";
+        const prevButton = document.createElement("button");
+        prevButton.type = "button";
+        prevButton.className = "p360-slideshow-button";
+        prevButton.textContent = "Previous";
+        const counter = document.createElement("span");
+        counter.className = "p360-slideshow-counter";
+        counter.setAttribute("aria-live", "polite");
+        const nextButton = document.createElement("button");
+        nextButton.type = "button";
+        nextButton.className = "p360-slideshow-button";
+        nextButton.textContent = "Next";
+
+        function showSlide(index) {
+          const slide = slides[index];
+          image.src = slide.imageSrc;
+          image.alt = slide.imageAlt || "";
+          slideTitle.textContent = slide.title || "";
+          slideText.textContent = slide.text || "";
+          counter.textContent = `${index + 1} of ${slides.length}`;
+          slideTitle.hidden = !slide.title;
+          slideText.hidden = !slide.text;
+          prevButton.disabled = slides.length <= 1;
+          nextButton.disabled = slides.length <= 1;
+        }
+
+        prevButton.addEventListener("click", () => {
+          currentSlide = (currentSlide - 1 + slides.length) % slides.length;
+          showSlide(currentSlide);
+        });
+
+        nextButton.addEventListener("click", () => {
+          currentSlide = (currentSlide + 1) % slides.length;
+          showSlide(currentSlide);
+        });
+
+        caption.append(slideTitle, slideText);
+        controls.append(prevButton, counter, nextButton);
+        slideshow.append(image, caption, controls);
+        showSlide(currentSlide);
+        return slideshow;
+      }
+
+      function p360HtmlToPlainText(html) {
+        if (!html) return "";
+        const template = document.createElement("template");
+        template.innerHTML = html;
+        return (template.content.textContent || "").replace(/\s+/g, " ").trim();
+      }
+
+      function p360AppendEmbedCode(embedCode, fallbackTitle) {
+        if (!embedCode) return;
+
+        const template = document.createElement("template");
+        template.innerHTML = embedCode.trim();
+
+        template.content.querySelectorAll("iframe").forEach((iframe) => {
+          if (!iframe.title) iframe.title = fallbackTitle || "Embedded media";
+          iframe.loading = "lazy";
+        });
+
+        template.content.querySelectorAll("video").forEach((video) => {
+          video.controls = true;
+          video.playsInline = true;
+          if (!video.getAttribute("aria-label") && fallbackTitle) {
+            video.setAttribute("aria-label", fallbackTitle);
+          }
+        });
+
+        template.content.querySelectorAll("audio").forEach((audio) => {
+          audio.controls = true;
+          if (!audio.getAttribute("aria-label") && fallbackTitle) {
+            audio.setAttribute("aria-label", fallbackTitle);
+          }
+        });
+
+        p360AnnotationMedia.appendChild(template.content.cloneNode(true));
+      }
+
+      function p360OpenAnnotation(data) {
+        p360AnnotationTitle.textContent = data.title || data.label || "Annotation";
+
+        const descriptionHtml = data.description || data.text || "";
+        p360AnnotationDescription.innerHTML = descriptionHtml;
+        p360AnnotationDescription.hidden = !descriptionHtml;
+        p360AnnotationMedia.replaceChildren();
+
+        if (data.mediaType === "image" && data.mediaSrc) {
+          const img = document.createElement("img");
+          img.src = data.mediaSrc;
+          img.alt = data.mediaAlt || "";
+          p360AnnotationMedia.appendChild(img);
+        } else if (data.mediaType === "embed" && data.mediaEmbed) {
+          p360AppendEmbedCode(
+            data.mediaEmbed,
+            data.mediaTitle || data.title || data.label || "Embedded media"
+          );
+        } else if (data.mediaType === "slideshow" && Array.isArray(data.slides) && data.slides.length > 0) {
+          p360AnnotationMedia.appendChild(p360CreateSlideshow(data.slides));
+        }
+
+        if (data.linkUrl && data.linkText) {
+          p360AnnotationLink.href = data.linkUrl;
+          p360AnnotationLink.textContent = data.linkText;
+          p360AnnotationLink.hidden = false;
+        } else {
+          p360AnnotationLink.href = "#";
+          p360AnnotationLink.textContent = "";
+          p360AnnotationLink.hidden = true;
+        }
+
+        p360OpenOverlay(p360AnnotationOverlay, p360AnnotationClose);
+      }
+
+      function p360CloseAnnotation(returnFocus = true) {
+        p360CloseOverlay(p360AnnotationOverlay, returnFocus);
+        p360AnnotationMedia.replaceChildren();
+      }
+
+      function p360BuildTextView() {
+        const scene = P360_SCENES[p360CurrentSceneId];
+        p360TextTitle.textContent = scene.title || p360CurrentSceneId;
+        p360TextDescription.textContent = scene.description || "No text description has been provided for this scene.";
+        p360TextHotspotList.replaceChildren();
+
+        const hotspots = scene.hotspots || [];
+        if (!hotspots.length) {
+          const item = document.createElement("li");
+          item.textContent = "This scene has no hotspots.";
+          p360TextHotspotList.appendChild(item);
+          return;
+        }
+
+        hotspots.forEach((hotspot) => {
+          const item = document.createElement("li");
+          item.className = "p360-text-hotspot-item";
+          const heading = document.createElement("h3");
+          heading.textContent = hotspot.title || hotspot.label || "Hotspot";
+          const description = document.createElement("p");
+          description.textContent = p360HtmlToPlainText(hotspot.description || hotspot.text) || (hotspot.type === "teleport" ? "Move to another scene." : "Open this annotation.");
+          const action = document.createElement("button");
+          action.type = "button";
+          action.className = "p360-text-action";
+
+          if (hotspot.type === "teleport") {
+            action.textContent = hotspot.label || "Go to scene";
+            action.addEventListener("click", () => {
+              p360CloseTextView(false);
+              p360GoToScene(hotspot.targetScene, {
+                yaw: hotspot.targetYaw,
+                pitch: hotspot.targetPitch,
+                hfov: hotspot.targetHfov
+              });
+              document.getElementById("p360-text-view-button").focus();
+            });
+          } else {
+            action.textContent = hotspot.label ? `Open: ${hotspot.label}` : "Open annotation";
+            action.addEventListener("click", () => {
+              p360CloseTextView(false);
+              p360OpenAnnotation(hotspot);
+            });
+          }
+
+          item.append(heading, description, action);
+          p360TextHotspotList.appendChild(item);
+        });
+      }
+
+      function p360OpenTextView() {
+        p360BuildTextView();
+        p360OpenOverlay(p360TextOverlay, p360TextClose);
+      }
+
+      function p360CloseTextView(returnFocus = true) {
+        p360CloseOverlay(p360TextOverlay, returnFocus);
+      }
+
+      p360AnnotationClose.addEventListener("click", () => p360CloseAnnotation());
+      p360TextClose.addEventListener("click", () => p360CloseTextView());
+      p360TextViewButton.addEventListener("click", p360OpenTextView);
+
+      [p360AnnotationOverlay, p360TextOverlay].forEach((overlay) => {
+        overlay.addEventListener("click", (event) => {
+          if (event.target !== overlay) return;
+          if (overlay === p360AnnotationOverlay) p360CloseAnnotation();
+          if (overlay === p360TextOverlay) p360CloseTextView();
+        });
+        overlay.addEventListener("keydown", (event) => p360TrapDialogFocus(event, overlay));
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (!p360AnnotationOverlay.hidden) p360CloseAnnotation();
+        else if (!p360TextOverlay.hidden) p360CloseTextView();
+      });
+
+      p360Viewer.on("scenechange", (sceneId) => p360UpdateSceneInterface(sceneId));
+
+      document.getElementById("p360-panorama").addEventListener("click", (event) => {
+        if (event.target.closest(".p360-hotspot")) return;
+        const pitch = p360Viewer.getPitch().toFixed(2);
+        const yaw = p360Viewer.getYaw().toFixed(2);
+        console.log(`Scene: ${p360CurrentSceneId} | Hotspot position: pitch: ${pitch}, yaw: ${yaw}`);
+      });
+
+      p360BuildSceneNavigation();
+      p360UpdateSceneInterface(P360_FIRST_SCENE);
+    })();
+  </script>
+</body>
+</html>
